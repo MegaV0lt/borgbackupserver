@@ -129,7 +129,7 @@ detect_os() {
             distro=$(grep "^creator=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
             os_version=$(grep "^version=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
             os_pretty="$distro $os_version"
-        fi   
+        fi
         # /usr/lib/enigma.info (OpenATV-specific)
         if [ -z "$distro" ] && [ -f /usr/lib/enigma.info ]; then
             distro=$(grep "^displaydistro=" /usr/lib/enigma.info 2>/dev/null | cut -d= -f2 | tr -d "'\r")
