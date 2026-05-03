@@ -119,7 +119,36 @@ detect_os() {
     local os_version=''
     local os_pretty=''
 
-    if [ -f /etc/os-release ]; then
+    # First check for Enigma2-based set-top boxes (e.g. Dreambox) which have a unique environment
+    # and are not detected properly by standard methods
+    if [ -f /proc/stb/info/model ] || [ -d /proc/stb/video ]; then  # Hardware indicators of Enigma2
+        local distro=''
+        OS="enigma2"
+        # /etc/image-version (OE-Alliance Standard)
+        if [ -f /etc/image-version ]; then
+            distro=$(grep "^creator=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
+            os_version=$(grep "^version=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
+            os_pretty="$distro $os_version"
+        fi   
+        # /usr/lib/enigma.info (OpenATV-specific)
+        if [ -z "$distro" ] && [ -f /usr/lib/enigma.info ]; then
+            distro=$(grep "^displaydistro=" /usr/lib/enigma.info 2>/dev/null | cut -d= -f2 | tr -d "'\r")
+            os_version=$(grep "^imgversion=" /usr/lib/enigma.info 2>/dev/null | cut -d= -f2 | tr -d "'\r")
+            os_pretty="$distro $os_version"
+        fi
+        # If still unknown, try Python boxbranding which is more robust and works across more images
+        if [ -z "$distro" ] && [ -f /usr/lib/enigma2/python/boxbranding.py ]; then
+            os_pretty=$(python3 -c "
+import sys
+sys.path.append('/usr/lib/enigma2/python')
+try:
+    from boxbranding import getImageDistro, getImageVersion
+    print('%s %s' % (getImageDistro(), getImageVersion()))
+except:
+    pass
+" 2>/dev/null)
+        fi
+    elif [ -f /etc/os-release ]; then
         . /etc/os-release
         OS=$ID
         os_version=$VERSION_ID
@@ -132,33 +161,6 @@ detect_os() {
         OS="freebsd"
         os_version=$(freebsd-version 2>/dev/null || uname -r)
         os_pretty="FreeBSD $os_version"
-    elif [ -f /proc/stb/info/model ] || [ -d /proc/stb/video ]; then  # Detect Enigma2-based set-top boxes (e.g. Dreambox)
-        local distro='Unknown'
-        OS="enigma2"
-        # /etc/image-version (OE-Alliance Standard)
-        if [ -f /etc/image-version ]; then
-            distro=$(grep "^creator=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
-            os_version=$(grep "^version=" /etc/image-version 2>/dev/null | cut -d= -f2 | tr -d '\r')
-            os_pretty="$distro $os_version"
-        fi   
-        # /usr/lib/enigma.info (OpenATV-specific)
-        if [ "$distro" = "Unknown" ] && [ -f /usr/lib/enigma.info ]; then
-            distro=$(grep "^displaydistro=" /usr/lib/enigma.info 2>/dev/null | cut -d= -f2 | tr -d "'\r")
-            os_version=$(grep "^imgversion=" /usr/lib/enigma.info 2>/dev/null | cut -d= -f2 | tr -d "'\r")
-            os_pretty="$distro $os_version"
-        fi
-        # If still unknown, try Python boxbranding which is more robust and works across more images
-        if [ "$distro" = "Unknown" ] && [ -f /usr/lib/enigma2/python/boxbranding.py ]; then
-            os_pretty=$(python3 -c "
-import sys
-sys.path.append('/usr/lib/enigma2/python')
-try:
-    from boxbranding import getImageDistro, getImageVersion
-    print(f'{getImageDistro()} {getImageVersion()}')
-except:
-    pass
-" 2>/dev/null)
-        fi
     else
         OS="unknown"
         os_pretty="Unknown OS"
